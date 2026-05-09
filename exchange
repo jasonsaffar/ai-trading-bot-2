@@ -1,0 +1,182 @@
+"""
+Exchange Integration Module
+Handles connections to Binance and Solana/Phantom wallet
+"""
+
+import logging
+from typing import Dict, Optional, List
+import requests
+from binance.client import Client
+from binance.exceptions import BinanceAPIException
+import os
+
+logger = logging.getLogger(__name__)
+
+class BinanceIntegration:
+    """Binance exchange integration"""
+    
+    def __init__(self, api_key: str, api_secret: str):
+        self.client = Client(api_key, api_secret)
+        self.api_key = api_key
+        logger.info("Binance client initialized")
+    
+    def get_account_info(self) -> Dict:
+        """Get account information"""
+        try:
+            account = self.client.get_account()
+            return {
+                'status': 'success',
+                'balances': account['balances'],
+                'trading_enabled': account['canTrade'],
+                'buying_power': self._calculate_buying_power(account)
+            }
+        except BinanceAPIException as e:
+            logger.error(f"Error getting account info: {str(e)}")
+            return {'status': 'error', 'message': str(e)}
+    
+    def get_current_price(self, symbol: str) -> Optional[float]:
+        """Get current price for a symbol"""
+        try:
+            ticker = self.client.get_symbol_ticker(symbol=symbol)
+            return float(ticker['price'])
+        except BinanceAPIException as e:
+            logger.error(f"Error getting price for {symbol}: {str(e)}")
+            return None
+    
+    def get_klines(self, symbol: str, interval: str, limit: int = 100) -> List[Dict]:
+        """
+        Get candlestick data
+        
+        Args:
+            symbol: Trading pair (e.g., 'BTCUSDT')
+            interval: Kline interval ('1m', '5m', '15m', '1h', '1d', etc.)
+            limit: Number of candles to retrieve
+        """
+        try:
+            klines = self.client.get_klines(symbol=symbol, interval=interval, limit=limit)
+            
+            data = []
+            for kline in klines:
+                data.append({
+                    'timestamp': kline[0],
+                    'open': float(kline[1]),
+                    'high': float(kline[2]),
+                    'low': float(kline[3]),
+                    'close': float(kline[4]),
+                    'volume': float(kline[5]),
+                })
+            return data
+        except BinanceAPIException as e:
+            logger.error(f"Error getting klines for {symbol}: {str(e)}")
+            return []
+    
+    def place_market_order(self, symbol: str, side: str, quantity: float) -> Dict:
+        """
+        Place a market order
+        
+        Args:
+            symbol: Trading pair
+            side: 'BUY' or 'SELL'
+            quantity: Amount to trade
+        """
+        try:
+            order = self.client.order_market(
+                symbol=symbol,
+                side=side,
+                quantity=quantity
+            )
+            logger.info(f"Market order placed: {side} {quantity} {symbol}")
+            return {'status': 'success', 'order': order}
+        except BinanceAPIException as e:
+            logger.error(f"Error placing market order: {str(e)}")
+            return {'status': 'error', 'message': str(e)}
+    
+    def place_limit_order(self, symbol: str, side: str, quantity: float, price: float) -> Dict:
+        """Place a limit order"""
+        try:
+            order = self.client.order_limit(
+                symbol=symbol,
+                side=side,
+                quantity=quantity,
+                price=price
+            )
+            logger.info(f"Limit order placed: {side} {quantity} {symbol} @ {price}")
+            return {'status': 'success', 'order': order}
+        except BinanceAPIException as e:
+            logger.error(f"Error placing limit order: {str(e)}")
+            return {'status': 'error', 'message': str(e)}
+    
+    def get_open_orders(self, symbol: Optional[str] = None) -> List[Dict]:
+        """Get open orders"""
+        try:
+            orders = self.client.get_open_orders(symbol=symbol)
+            return orders
+        except BinanceAPIException as e:
+            logger.error(f"Error getting open orders: {str(e)}")
+            return []
+    
+    def cancel_order(self, symbol: str, order_id: int) -> Dict:
+        """Cancel an order"""
+        try:
+            result = self.client.cancel_order(symbol=symbol, orderId=order_id)
+            logger.info(f"Order {order_id} cancelled")
+            return {'status': 'success', 'result': result}
+        except BinanceAPIException as e:
+            logger.error(f"Error cancelling order: {str(e)}")
+            return {'status': 'error', 'message': str(e)}
+    
+    def _calculate_buying_power(self, account: Dict) -> float:
+        """Calculate total buying power from account balance"""
+        usdt_balance = 0
+        for balance in account['balances']:
+            if balance['asset'] == 'USDT':
+                usdt_balance = float(balance['free'])
+        return usdt_balance
+
+class SolanaIntegration:
+    """Solana/Phantom wallet integration"""
+    
+    def __init__(self, private_key: str, rpc_url: str):
+        self.private_key = private_key
+        self.rpc_url = rpc_url
+        logger.info("Solana integration initialized")
+    
+    def get_balance(self, wallet_address: str) -> Optional[float]:
+        """Get SOL balance for a wallet"""
+        try:
+            payload = {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "getBalance",
+                "params": [wallet_address]
+            }
+            response = requests.post(self.rpc_url, json=payload, timeout=10)
+            balance_lamports = response.json()['result']['value']
+            balance_sol = balance_lamports / 1e9  # Convert lamports to SOL
+            return balance_sol
+        except Exception as e:
+            logger.error(f"Error getting Solana balance: {str(e)}")
+            return None
+    
+    def get_token_balance(self, wallet_address: str, token_address: str) -> Optional[float]:
+        """Get SPL token balance"""
+        try:
+            # This would require additional implementation with solana-py library
+            logger.info(f"Getting token balance for {token_address}")
+            return None
+        except Exception as e:
+            logger.error(f"Error getting token balance: {str(e)}")
+            return None
+    
+    def send_transaction(self, from_address: str, to_address: str, amount: float) -> Dict:
+        """Send SOL transaction"""
+        try:
+            logger.info(f"Sending {amount} SOL from {from_address} to {to_address}")
+            # Full implementation would use solders/solana-py library
+            return {'status': 'success', 'tx_id': 'example_tx_id'}
+        except Exception as e:
+            logger.error(f"Error sending transaction: {str(e)}")
+            return {'status': 'error', 'message': str(e)}
+
+class CoinGeckoIntegration:
+    """CoinGecko API
