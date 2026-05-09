@@ -1,0 +1,96 @@
+"""
+Configuration management for the AI Trading Bot
+Loads settings from environment variables and config files
+"""
+
+import os
+from dotenv import load_dotenv
+from pathlib import Path
+
+# Load environment variables
+load_dotenv()
+
+class Config:
+    """Base configuration"""
+    
+    # API Keys & Credentials
+    BINANCE_API_KEY = os.getenv('BINANCE_API_KEY', '')
+    BINANCE_API_SECRET = os.getenv('BINANCE_API_SECRET', '')
+    PHANTOM_PRIVATE_KEY = os.getenv('PHANTOM_PRIVATE_KEY', '')
+    SOLANA_RPC_URL = os.getenv('SOLANA_RPC_URL', 'https://api.mainnet-beta.solana.com')
+    COINGECKO_API_KEY = os.getenv('COINGECKO_API_KEY', '')
+    
+    # Notification Settings
+    TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN', '')
+    TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID', '')
+    TWILIO_ACCOUNT_SID = os.getenv('TWILIO_ACCOUNT_SID', '')
+    TWILIO_AUTH_TOKEN = os.getenv('TWILIO_AUTH_TOKEN', '')
+    
+    # Trading Settings
+    TRADE_MODE = os.getenv('TRADE_MODE', 'paper')  # 'live' or 'paper'
+    LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
+    DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///trading_bot.db')
+    
+    # Technical Analysis Settings
+    RSI_PERIOD = 14
+    RSI_OVERBOUGHT = 70
+    RSI_OVERSOLD = 30
+    
+    MACD_FAST = 12
+    MACD_SLOW = 26
+    MACD_SIGNAL = 9
+    
+    SMA_SHORT = 20
+    SMA_LONG = 50
+    
+    # Risk Management
+    STOP_LOSS_PERCENT = 2.0  # 2% below entry
+    TAKE_PROFIT_PERCENT = 5.0  # 5% above entry
+    MAX_POSITION_SIZE = 0.1  # 10% of portfolio per trade
+    MAX_CONCURRENT_TRADES = 5
+    
+    # Backtesting
+    INITIAL_CAPITAL = 10000  # Starting balance for backtests
+    COMMISSION = 0.001  # 0.1% commission per trade
+    
+    # Monitoring
+    CHECK_INTERVAL = 60  # Check for signals every 60 seconds
+    PRICE_UPDATE_INTERVAL = 5  # Update prices every 5 seconds
+    
+    # Assets to Monitor
+    ASSETS = [
+        'BTCUSDT',
+        'ETHUSDT',
+        'SOLANA',
+        'BNBUSDT',
+        'ADAUSDT'
+    ]
+    
+    # Database Settings
+    DB_POOL_SIZE = 10
+    DB_MAX_OVERFLOW = 20
+    
+class DevelopmentConfig(Config):
+    """Development configuration"""
+    DEBUG = True
+    TRADE_MODE = 'paper'
+
+class ProductionConfig(Config):
+    """Production configuration - for live trading"""
+    DEBUG = False
+    TRADE_MODE = 'live'
+
+class TestingConfig(Config):
+    """Testing configuration"""
+    DEBUG = True
+    DATABASE_URL = 'sqlite:///:memory:'
+    TRADE_MODE = 'paper'
+
+# Select config based on environment
+ENV = os.getenv('FLASK_ENV', 'development')
+if ENV == 'production':
+    config = ProductionConfig()
+elif ENV == 'testing':
+    config = TestingConfig()
+else:
+    config = DevelopmentConfig()
